@@ -10,12 +10,21 @@
 #include <fcntl.h>
 
 #include <mavlink.h>
+#include "file_output.h"
 
-static volatile sig_atomic_t m_run = true;
+static volatile sig_atomic_t m_run;
 
 static void sigint_handler(int signum)
 {
-    m_run = false;
+	m_run = false;
+}
+
+static suseconds_t microseconds()
+{
+	static struct timeval tv;
+	gettimeofday(&tv, NULL);
+
+	return ((tv.tv_sec * 1000000UL) + tv.tv_usec);
 }
 
 static int open_port(char *p_path) {
@@ -30,7 +39,8 @@ static int open_port(char *p_path) {
 	tcgetattr(fd, &options);
 
 	/* Inspired by https://github.com/mavlink/c_uart_interface_example/blob/master/serial_port.cpp: */
-	options.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK | ISTRIP | IXON);
+	options.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK |
+			     ISTRIP | IXON);
 	options.c_oflag &= ~(OCRNL | ONLCR | ONLRET | ONOCR | OFILL | OPOST);
 	options.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG);
 	options.c_cflag &= ~(CSIZE | PARENB);
@@ -46,38 +56,6 @@ static int open_port(char *p_path) {
 	tcsetattr(fd, TCSANOW, &options);
 
 	return fd;
-}
-
-static void serialize(mavlink_message_t *p_msg)
-{
-	switch (p_msg->msgid) {
-	case MAVLINK_MSG_ID_HEARTBEAT:
-		printf("MAVLINK_MSG_ID_HEARTBEAT\n");
-		break;
-	case MAVLINK_MSG_ID_OPTICAL_FLOW:
-	{
-		printf("MAVLINK_MSG_ID_OPTICAL_FLOW\n");
-
-		mavlink_optical_flow_t msg_flow;
-		mavlink_msg_optical_flow_decode(p_msg, &msg_flow);
-		break;
-	}
-	case MAVLINK_MSG_ID_OPTICAL_FLOW_RAD:
-	{
-		printf("MAVLINK_MSG_ID_OPTICAL_FLOW_RAD\n");
-
-		mavlink_optical_flow_rad_t msg_flow_rad;
-		mavlink_msg_optical_flow_rad_decode(p_msg, &msg_flow_rad);
-		break;
-	}
-	case MAVLINK_MSG_ID_DEBUG_VECT:
-	case MAVLINK_MSG_ID_ENCAPSULATED_DATA:
-		/* Ignore */
-		break;
-	default:
-		printf("Unknown message ID: %d\n", p_msg->msgid);
-		break;
-	}
 }
 
 static bool set_params(int fd)
@@ -100,44 +78,95 @@ int main(int argc, char **argv)
 {
 	char buffer[32];
 	char *p_portname;
-
-	if (argc < 2) {
-		fprintf(stderr, "Usage: %s <port>\n", argv[0]);
-		return 1;
-	} else {
-		p_portname = argv[1];
-	}
-
-	signal(SIGINT, sigint_handler);
-
+	char *p_filename;
 	mavlink_message_t msg;
 	mavlink_status_t status;
+	bool verbose = false;
 
-	int fd = open_port(p_portname);
+	/* Check input parameters: */
+	if (argc < 3) {
+		fprintf(stderr, "Usage: %s [--verbose] <serial_port> "
+				"<output_file>\n", argv[0]);
+		return 1;
+	} else {
+		if (argc > 3) {
+			if (strcmp(argv[1], "-v") == 0 ||
+			    strcmp(argv[1], "--verbose") == 0)
+				verbose = true;
 
-	if (fd == -1) {
-		fprintf(stderr, "%s: Cannot open port %s\n", argv[0], p_portname);
+			p_portname = argv[2];
+			p_filename = argv[3];
+		} else {
+			p_portname = argv[1];
+			p_filename = argv[2];
+		}
+	}
+
+	/* Open output file: */
+	if (verbose)
+		printf("%s: Opening file %s\n", argv[0], p_filename);
+
+	if (!file_output_init(p_filename)) {
+		fprintf(stderr, "%s: Cannot open file %s\n", argv[0],
+			p_filename);
 		return 1;
 	}
 
-	printf("%s: Setting parameters\n", argv[0]);
+	/* Open serial port: */
+	if (verbose)
+		printf("%s: Opening port %s\n", argv[0], p_portname);
+
+	int fd = open_port(p_portname);
+	if (fd == -1) {
+		fprintf(stderr, "%s: Cannot open port %s\n", argv[0],
+			p_portname);
+		file_output_close();
+		return 1;
+	}
+
+	/* Set parameters and start listening: */
+	if (verbose)
+		printf("%s: Setting parameters\n", argv[0]);
 
 	if (!set_params(fd)) {
 		fprintf(stderr, "%s: Unable to set parameters\n", argv[0]);
-		m_run = false;
 	} else {
-		printf("%s: Listening on %s\n", argv[0], p_portname);
+		signal(SIGINT, sigint_handler);
+		m_run = true;
+
+		if (verbose)
+			printf("%s: Listening!\n", argv[0]);
 	}
+
+	int count_recvd = 0;
+	int count_saved = 0;
 
 	while (m_run) {
 		int nread = read(fd, buffer, sizeof(buffer));
 
-		for (int i = 0; i < nread; i++)
-			if (mavlink_parse_char(MAVLINK_COMM_0, buffer[i], &msg, &status))
-				serialize(&msg);
+		for (int i = 0; i < nread; i++) {
+			if (mavlink_parse_char(MAVLINK_COMM_0, buffer[i], &msg,
+					       &status)) {
+				count_recvd++;
+				if (file_output_serialize(microseconds(), &msg))
+					count_saved++;
+
+				if (verbose) {
+					printf("\r%s: Saved %d of %d messages",
+					       argv[0], count_saved,
+					       count_recvd);
+					fflush(stdout);
+				}
+			}
+		}
 	}
 
+	/* Close everything: */
+	file_output_close();
 	close(fd);
+
+	if (verbose)
+		printf("\n%s: Finished\n", argv[0]);
 
 	return 0;
 }
