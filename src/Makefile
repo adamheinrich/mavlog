@@ -64,8 +64,5 @@ $(BUILD_DIR)/$(BIN): $(OBJS_C)
 	@echo "Linking binary: $(notdir $@)"
 	$(CMD_ECHO) $(LD) $(LDFLAGS) -o $@ $^ $(LDLIBFLAGS)
 
-run: $(BUILD_DIR)/$(BIN)
-	$(BUILD_DIR)/$(BIN) /dev/ttyACM0
-
 clean:
 	rm -f $(BUILD_DIR)/$(BIN) $(BUILD_DIR)/*.map $(BUILD_DIR)/*.o
