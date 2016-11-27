@@ -17,6 +17,7 @@ SRC_C =
 
 # Defines required by included libraries
 DEF =
+#DEF += -DDEBUG
 
 # Compiler and linker flags
 ARCHFLAGS =
