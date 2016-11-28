@@ -51,6 +51,26 @@ static bool serialize_msg_flow_rad(file_output_t *p_fout, suseconds_t timestamp,
 	return true;
 }
 
+static bool serialize_msg_flow_debug_vect(file_output_t *p_fout,
+					  suseconds_t timestamp,
+					  mavlink_message_t *p_msg)
+{
+	mavlink_debug_vect_t dv;
+	mavlink_msg_debug_vect_decode(p_msg, &dv);
+
+	int nwr = fprintf(p_fout->p_file,
+			  "%lu;%d;%lu;%f;%f;%f;0;0;0;0;0;0\n", timestamp,
+			  p_msg->msgid, dv.time_usec, dv.x, dv.y, dv.z);
+
+	if (nwr < 0)
+		return false;
+
+	if (fflush(p_fout->p_file) != 0)
+		return false;
+
+	return true;
+}
+
 bool file_output_open(file_output_t *p_fout, char *p_filename)
 {
 	p_fout->p_file = fopen(p_filename, "w");
@@ -81,6 +101,8 @@ bool file_output_serialize(file_output_t *p_fout, suseconds_t timestamp,
 		DBG("\nfile_output_serialize(): OPTICAL_FLOW_RAD\n");
 		return serialize_msg_flow_rad(p_fout, timestamp, p_msg);
 	case MAVLINK_MSG_ID_DEBUG_VECT:
+		DBG("\nfile_output_serialize(): DEBUG_VECT\n");
+		return serialize_msg_flow_debug_vect(p_fout, timestamp, p_msg);
 	case MAVLINK_MSG_ID_ENCAPSULATED_DATA:
 		/* Ignore */
 		break;
