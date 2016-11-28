@@ -12,6 +12,11 @@
 #include <mavlink.h>
 #include "file_output.h"
 
+#define SYS_ID_SELF		42
+#define COMP_ID_SELF		MAV_COMP_ID_LOG
+#define SYS_ID_PF4FLOW		81
+#define COMP_ID_PF4FLOW		50
+
 static volatile sig_atomic_t m_run;
 
 static void sigint_handler(int signum)
@@ -63,7 +68,8 @@ static bool set_params(int fd)
 	uint8_t buffer[64];
 	mavlink_message_t msg;
 
-	mavlink_msg_param_set_pack(42, MAV_COMP_ID_LOG, &msg, 81, 50,
+	mavlink_msg_param_set_pack(SYS_ID_SELF, COMP_ID_SELF, &msg,
+				   SYS_ID_PF4FLOW, COMP_ID_PF4FLOW,
 				   "USB_SEND_VIDEO", 0, MAV_PARAM_TYPE_UINT8);
 
 	int len = mavlink_msg_to_send_buffer(buffer, &msg);
