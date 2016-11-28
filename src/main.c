@@ -29,7 +29,7 @@ static suseconds_t microseconds()
 	return ((tv.tv_sec * 1000000UL) + tv.tv_usec);
 }
 
-static bool set_params(serial_t *p_port)
+static bool configure_px4flow(serial_t *p_port)
 {
 	uint8_t buffer[64];
 	mavlink_message_t msg;
@@ -100,10 +100,10 @@ int main(int argc, char **argv)
 
 	/* Set parameters and start listening: */
 	if (verbose)
-		printf("%s: Setting parameters\n", argv[0]);
+		printf("%s: Configuring PF4Flow\n", argv[0]);
 
-	if (!set_params(&port)) {
-		fprintf(stderr, "%s: Unable to set parameters\n", argv[0]);
+	if (!configure_px4flow(&port)) {
+		fprintf(stderr, "%s: Unable to configure PF4Flow\n", argv[0]);
 	} else {
 		signal(SIGINT, sigint_handler);
 		m_run = true;
