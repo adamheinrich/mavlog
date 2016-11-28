@@ -2,15 +2,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
-#include <unistd.h>
-#include <termios.h>
-#include <fcntl.h>
 
 #include <mavlink.h>
 #include "file_output.h"
+#include "serial.h"
 
 #define SYS_ID_SELF		42
 #define COMP_ID_SELF		MAV_COMP_ID_LOG
@@ -32,38 +29,7 @@ static suseconds_t microseconds()
 	return ((tv.tv_sec * 1000000UL) + tv.tv_usec);
 }
 
-static int open_port(char *p_path) {
-	int fd = open(p_path, (O_RDWR | O_NOCTTY | O_NDELAY));
-
-	if (fd == -1)
-		return -1;
-
-	fcntl(fd, F_SETFL, 0);
-
-	struct termios options;
-	tcgetattr(fd, &options);
-
-	/* Inspired by https://github.com/mavlink/c_uart_interface_example/blob/master/serial_port.cpp: */
-	options.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK |
-			     ISTRIP | IXON);
-	options.c_oflag &= ~(OCRNL | ONLCR | ONLRET | ONOCR | OFILL | OPOST);
-	options.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG);
-	options.c_cflag &= ~(CSIZE | PARENB);
-	options.c_cflag |= CS8;
-
-	options.c_cc[VMIN] = 1; /* minimum bytes to return from read() */
-	options.c_cc[VTIME] = 10; /* inter-character timer */
-
-	/* Baudrate has no effect when using the USB/UART converter */
-	cfsetispeed(&options, B115200);
-	cfsetospeed(&options, B115200);
-
-	tcsetattr(fd, TCSANOW, &options);
-
-	return fd;
-}
-
-static bool set_params(int fd)
+static bool set_params(serial_t *p_port)
 {
 	uint8_t buffer[64];
 	mavlink_message_t msg;
@@ -73,7 +39,7 @@ static bool set_params(int fd)
 				   "USB_SEND_VIDEO", 0, MAV_PARAM_TYPE_UINT8);
 
 	int len = mavlink_msg_to_send_buffer(buffer, &msg);
-	int nwr = write(fd, buffer, len);
+	int nwr = serial_write(p_port, buffer, len);
 	if (nwr != len)
 		return false;
 
@@ -82,11 +48,12 @@ static bool set_params(int fd)
 
 int main(int argc, char **argv)
 {
-	char buffer[32];
+	uint8_t buffer[32];
 	char *p_portname;
 	char *p_filename;
 	mavlink_message_t msg;
 	mavlink_status_t status;
+	serial_t port;
 	bool verbose = false;
 
 	/* Check input parameters: */
@@ -122,8 +89,7 @@ int main(int argc, char **argv)
 	if (verbose)
 		printf("%s: Opening port %s\n", argv[0], p_portname);
 
-	int fd = open_port(p_portname);
-	if (fd == -1) {
+	if (!serial_open(&port, p_portname)) {
 		fprintf(stderr, "%s: Cannot open port %s\n", argv[0],
 			p_portname);
 		file_output_close();
@@ -134,7 +100,7 @@ int main(int argc, char **argv)
 	if (verbose)
 		printf("%s: Setting parameters\n", argv[0]);
 
-	if (!set_params(fd)) {
+	if (!set_params(&port)) {
 		fprintf(stderr, "%s: Unable to set parameters\n", argv[0]);
 	} else {
 		signal(SIGINT, sigint_handler);
@@ -148,7 +114,7 @@ int main(int argc, char **argv)
 	int count_saved = 0;
 
 	while (m_run) {
-		int nread = read(fd, buffer, sizeof(buffer));
+		int nread = serial_read(&port, buffer, sizeof(buffer));
 
 		for (int i = 0; i < nread; i++) {
 			if (mavlink_parse_char(MAVLINK_COMM_0, buffer[i], &msg,
@@ -169,7 +135,7 @@ int main(int argc, char **argv)
 
 	/* Close everything: */
 	file_output_close();
-	close(fd);
+	serial_close(&port);
 
 	if (verbose)
 		printf("\n%s: Finished\n", argv[0]);
