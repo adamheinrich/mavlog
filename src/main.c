@@ -57,23 +57,24 @@ int main(int argc, char **argv)
 	serial_t port;
 	bool verbose = false;
 
-	/* Check input parameters: */
-	if (argc < 3) {
+	/* Read input parameters: */
+	switch (argc) {
+	case 3:
+		p_portname = argv[1];
+		p_filename = argv[2];
+		break;
+	case 4:
+		if (strcmp(argv[1], "-v") == 0 ||
+		    strcmp(argv[1], "--verbose") == 0)
+			verbose = true;
+
+		p_portname = argv[2];
+		p_filename = argv[3];
+		break;
+	default:
 		fprintf(stderr, "Usage: %s [--verbose] <serial_port> "
 				"<output_file>\n", argv[0]);
 		return 1;
-	} else {
-		if (argc > 3) {
-			if (strcmp(argv[1], "-v") == 0 ||
-			    strcmp(argv[1], "--verbose") == 0)
-				verbose = true;
-
-			p_portname = argv[2];
-			p_filename = argv[3];
-		} else {
-			p_portname = argv[1];
-			p_filename = argv[2];
-		}
 	}
 
 	/* Open output file: */
