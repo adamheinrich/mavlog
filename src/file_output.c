@@ -13,7 +13,7 @@ static bool serialize_msg_flow(file_output_t *p_fout, suseconds_t timestamp,
 	mavlink_msg_optical_flow_decode(p_msg, &of);
 
 	int nwr = fprintf(p_fout->p_file,
-			  "%lu;%d;%lu;%f;%f;%f;%d;%d;%d;%d;0;0\n",
+			  "%lu;%d;%lu;%f;%f;%f;%d;%d;%d;%d;0;0;0;0\n",
 			  timestamp, p_msg->msgid, of.time_usec,
 			  of.flow_comp_m_x, of.flow_comp_m_y,
 			  of.ground_distance, of.flow_x, of.flow_y,
@@ -32,15 +32,17 @@ static bool serialize_msg_flow_rad(file_output_t *p_fout, suseconds_t timestamp,
 				   mavlink_message_t *p_msg)
 {
 	mavlink_optical_flow_rad_t of;
+	memset(&of, 0, sizeof(of));
 	mavlink_msg_optical_flow_rad_decode(p_msg, &of);
 
-	int nwr = fprintf(p_fout->p_file,
-			  "%lu;%d;%lu;%f;%f;%f;%f;%f;%u;%f;%d;%d\n", timestamp,
-			  p_msg->msgid, of.time_usec, of.integrated_x,
+	int nwr = fprintf(p_fout->p_file, "%lu;%d;%lu;%u;%f;%f;%f;%f;%f;",
+			  timestamp, p_msg->msgid, of.time_usec,
+			  of.integration_time_us, of.integrated_x,
 			  of.integrated_y, of.integrated_xgyro,
-			  of.integrated_ygyro, of.integrated_zgyro,
-			  of.time_delta_distance_us, of.distance,
-			  of.temperature, of.quality);
+			  of.integrated_ygyro, of.integrated_zgyro);
+	nwr += fprintf(p_fout->p_file, "%u;%f;%d;%d;%d\n",
+		       of.time_delta_distance_us, of.distance, of.temperature,
+		       of.sensor_id, of.quality);
 
 	if (nwr < 0)
 		return false;
@@ -59,7 +61,7 @@ static bool serialize_msg_flow_debug_vect(file_output_t *p_fout,
 	mavlink_msg_debug_vect_decode(p_msg, &dv);
 
 	int nwr = fprintf(p_fout->p_file,
-			  "%lu;%d;%lu;%f;%f;%f;0;0;0;0;0;0\n", timestamp,
+			  "%lu;%d;%lu;%f;%f;%f;0;0;0;0;0;0;0;0\n", timestamp,
 			  p_msg->msgid, dv.time_usec, dv.x, dv.y, dv.z);
 
 	if (nwr < 0)
