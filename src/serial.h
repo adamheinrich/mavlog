@@ -6,6 +6,7 @@
 
 typedef struct {
 	int fd;
+	bool initialized;
 } serial_t;
 
 bool serial_open(serial_t *p_serial, char *p_path);

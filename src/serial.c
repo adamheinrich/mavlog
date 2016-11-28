@@ -8,8 +8,10 @@ bool serial_open(serial_t *p_serial, char *p_path)
 {
 	p_serial->fd = open(p_path, (O_RDWR | O_NOCTTY | O_NDELAY));
 
-	if (p_serial->fd == -1)
+	if (p_serial->fd == -1) {
+		p_serial->initialized = false;
 		return false;
+	}
 
 	fcntl(p_serial->fd, F_SETFL, 0);
 
@@ -33,23 +35,33 @@ bool serial_open(serial_t *p_serial, char *p_path)
 
 	tcsetattr(p_serial->fd, TCSANOW, &options);
 
+	p_serial->initialized = true;
+
 	return true;
 }
 
 int serial_write(serial_t *p_serial, uint8_t *p_buffer, int len)
 {
+	if (!p_serial->initialized)
+		return -1;
+
 	return write(p_serial->fd, p_buffer, len);
 }
 
 int serial_read(serial_t *p_serial, uint8_t *p_buffer, int len)
 {
+	if (!p_serial->initialized)
+		return -1;
+
 	return read(p_serial->fd, p_buffer, len);
 }
 
 bool serial_close(serial_t *p_serial)
 {
-	if (close(p_serial->fd) == 0)
+	if (p_serial->initialized && close(p_serial->fd) == 0) {
+		p_serial->initialized = false;
 		return true;
+	}
 
 	return false;
 }
