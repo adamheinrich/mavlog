@@ -16,26 +16,27 @@ Then simply run `make` in the `src` directory.
 
 ## Usage
 
-To log messages from a sensor connected to `/dev/ttyACM0` into file `log.csv`:
+To log messages from a sensor connected to `/dev/ttyACM0` into file `log.csv`,
+run:
 
 ```
 mavlink /dev/ttyACM0 log.csv
 ```
 
-Use `-v` if you want verbose output.
+Run `mavlink -v <port> <filename>` if you like verbose output.
 
 ## Output file format
 
-The logger logs three message types into a CSV file separated by semicolon (;).
-Rows with less than 14 numbers are padded by zeros. The `timestamp` value is a
-system time (in microseconds).
+The logger logs three message types into a CSV file separated by semicolon. Rows
+with less than 14 numbers are padded by zeros. The `timestamp` value is a system
+time in microseconds.
 
 [OPTICAL_FLOW][4]:
 ```
 timestamp;100;time_usec;flow_comp_m_x;flow_comp_m_y;ground_distance;flow_x;flow_y;sensor_id;quality;0;0;0;0
 ```
 
-[OPTICAL_FLOW_RAD][5]
+[OPTICAL_FLOW_RAD][5]:
 ```
 timestamp;106;time_usec;integration_time_us;integrated_x;integrated_y;integrated_xgyro;integrated_ygyro;integrated_zgyro;time_delta_distance_us;distance;temperature;sensor_id;quality
 ```
@@ -59,11 +60,12 @@ If you want to set any other [parameter][7], simply modify function
 
 ## Known limitations
 
-File serial.c contains hard-coded baudrate to 115200 kbps. This works correctly
-for a PF4Flow connected via USB (as the baudrate settings have no effect) and
-should also work for a PX4Flow connected via UART.
+The baudrate is hard-coded to 115200 kbps. This works correctly for a PF4Flow
+connected via USB (as the baudrate settings have no effect) and should also work
+for a PX4Flow connected via UART.
 
-If you want a different configuration, simply change relevant lines
+If you want a different configuration, simply change relevant lines in
+`serial.c`:
 
 ```
 cfsetispeed(&options, B115200);
