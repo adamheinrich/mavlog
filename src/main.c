@@ -53,6 +53,7 @@ int main(int argc, char **argv)
 	char *p_filename;
 	mavlink_message_t msg;
 	mavlink_status_t status;
+	file_output_t output;
 	serial_t port;
 	bool verbose = false;
 
@@ -79,7 +80,7 @@ int main(int argc, char **argv)
 	if (verbose)
 		printf("%s: Opening file %s\n", argv[0], p_filename);
 
-	if (!file_output_init(p_filename)) {
+	if (!file_output_init(&output, p_filename)) {
 		fprintf(stderr, "%s: Cannot open file %s\n", argv[0],
 			p_filename);
 		return 1;
@@ -92,7 +93,7 @@ int main(int argc, char **argv)
 	if (!serial_open(&port, p_portname)) {
 		fprintf(stderr, "%s: Cannot open port %s\n", argv[0],
 			p_portname);
-		file_output_close();
+		file_output_close(&output);
 		return 1;
 	}
 
@@ -119,8 +120,9 @@ int main(int argc, char **argv)
 		for (int i = 0; i < nread; i++) {
 			if (mavlink_parse_char(MAVLINK_COMM_0, buffer[i], &msg,
 					       &status)) {
+				suseconds_t t = microseconds();
 				count_recvd++;
-				if (file_output_serialize(microseconds(), &msg))
+				if (file_output_serialize(&output, t, &msg))
 					count_saved++;
 
 				if (verbose) {
@@ -134,7 +136,7 @@ int main(int argc, char **argv)
 	}
 
 	/* Close everything: */
-	file_output_close();
+	file_output_close(&output);
 	serial_close(&port);
 
 	if (verbose)

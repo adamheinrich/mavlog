@@ -1,5 +1,4 @@
 #include "file_output.h"
-#include <stdio.h>
 
 #ifdef DEBUG
 #define DBG	printf
@@ -7,15 +6,14 @@
 #define DBG(...)
 #endif
 
-static FILE *m_fh;
-static bool m_initialized;
-
-static bool serialize_msg_flow(suseconds_t timestamp, mavlink_message_t *p_msg)
+static bool serialize_msg_flow(file_output_t *p_fout, suseconds_t timestamp,
+			       mavlink_message_t *p_msg)
 {
 	mavlink_optical_flow_t of;
 	mavlink_msg_optical_flow_decode(p_msg, &of);
 
-	int nwr = fprintf(m_fh, "%lu;%d;%lu;%f;%f;%f;%d;%d;%d;%d;0;0\n",
+	int nwr = fprintf(p_fout->p_file,
+			  "%lu;%d;%lu;%f;%f;%f;%d;%d;%d;%d;0;0\n",
 			  timestamp, p_msg->msgid, of.time_usec,
 			  of.flow_comp_m_x, of.flow_comp_m_y,
 			  of.ground_distance, of.flow_x, of.flow_y,
@@ -24,21 +22,22 @@ static bool serialize_msg_flow(suseconds_t timestamp, mavlink_message_t *p_msg)
 	if (nwr < 0)
 		return false;
 
-	if (fflush(m_fh) != 0)
+	if (fflush(p_fout->p_file) != 0)
 		return false;
 
 	return true;
 }
 
-static bool serialize_msg_flow_rad(suseconds_t timestamp,
+static bool serialize_msg_flow_rad(file_output_t *p_fout, suseconds_t timestamp,
 				   mavlink_message_t *p_msg)
 {
 	mavlink_optical_flow_rad_t of;
 	mavlink_msg_optical_flow_rad_decode(p_msg, &of);
 
-	int nwr = fprintf(m_fh, "%lu;%d;%lu;%f;%f;%f;%f;%f;%u;%f;"
-			  "%d;%d\n", timestamp, p_msg->msgid, of.time_usec,
-			  of.integrated_x, of.integrated_y, of.integrated_xgyro,
+	int nwr = fprintf(p_fout->p_file,
+			  "%lu;%d;%lu;%f;%f;%f;%f;%f;%u;%f;%d;%d\n", timestamp,
+			  p_msg->msgid, of.time_usec, of.integrated_x,
+			  of.integrated_y, of.integrated_xgyro,
 			  of.integrated_ygyro, of.integrated_zgyro,
 			  of.time_delta_distance_us, of.distance,
 			  of.temperature, of.quality);
@@ -46,28 +45,29 @@ static bool serialize_msg_flow_rad(suseconds_t timestamp,
 	if (nwr < 0)
 		return false;
 
-	if (fflush(m_fh) != 0)
+	if (fflush(p_fout->p_file) != 0)
 		return false;
 
 	return true;
 }
 
-bool file_output_init(char *p_filename)
+bool file_output_init(file_output_t *p_fout, char *p_filename)
 {
-	m_fh = fopen(p_filename, "w");
-	if (m_fh == NULL) {
-		m_initialized = false;
+	p_fout->p_file = fopen(p_filename, "w");
+	if (p_fout->p_file == NULL) {
+		p_fout->initialized = false;
 		return false;
 	}
 
-	m_initialized = true;
+	p_fout->initialized = true;
 
 	return true;
 }
 
-bool file_output_serialize(suseconds_t timestamp, mavlink_message_t *p_msg)
+bool file_output_serialize(file_output_t *p_fout, suseconds_t timestamp,
+			   mavlink_message_t *p_msg)
 {
-	if (!m_initialized)
+	if (!p_fout->initialized)
 		return false;
 
 	switch (p_msg->msgid) {
@@ -76,10 +76,10 @@ bool file_output_serialize(suseconds_t timestamp, mavlink_message_t *p_msg)
 		break;
 	case MAVLINK_MSG_ID_OPTICAL_FLOW:
 		DBG("\nfile_output_serialize(): OPTICAL_FLOW\n");
-		return serialize_msg_flow(timestamp, p_msg);
+		return serialize_msg_flow(p_fout, timestamp, p_msg);
 	case MAVLINK_MSG_ID_OPTICAL_FLOW_RAD:
 		DBG("\nfile_output_serialize(): OPTICAL_FLOW_RAD\n");
-		return serialize_msg_flow_rad(timestamp, p_msg);
+		return serialize_msg_flow_rad(p_fout, timestamp, p_msg);
 	case MAVLINK_MSG_ID_DEBUG_VECT:
 	case MAVLINK_MSG_ID_ENCAPSULATED_DATA:
 		/* Ignore */
@@ -93,9 +93,9 @@ bool file_output_serialize(suseconds_t timestamp, mavlink_message_t *p_msg)
 	return false;
 }
 
-bool file_output_close(void)
+bool file_output_close(file_output_t *p_fout)
 {
-	if (m_initialized && fclose(m_fh) == 0)
+	if (p_fout->initialized && fclose(p_fout->p_file) == 0)
 		return true;
 
 	return false;
