@@ -95,8 +95,10 @@ bool file_output_serialize(file_output_t *p_fout, suseconds_t timestamp,
 
 bool file_output_close(file_output_t *p_fout)
 {
-	if (p_fout->initialized && fclose(p_fout->p_file) == 0)
+	if (p_fout->initialized && fclose(p_fout->p_file) == 0) {
+		p_fout->initialized = false;
 		return true;
+	}
 
 	return false;
 }
