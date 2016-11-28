@@ -20,10 +20,10 @@ To log messages from a sensor connected to `/dev/ttyACM0` into file `log.csv`,
 run:
 
 ```
-mavlink /dev/ttyACM0 log.csv
+mavlog /dev/ttyACM0 log.csv
 ```
 
-Run `mavlink -v <port> <filename>` if you like verbose output.
+Run `mavlog -v <port> <filename>` if you like verbose output.
 
 ## Output file format
 
