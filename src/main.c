@@ -80,7 +80,7 @@ int main(int argc, char **argv)
 	if (verbose)
 		printf("%s: Opening file %s\n", argv[0], p_filename);
 
-	if (!file_output_init(&output, p_filename)) {
+	if (!file_output_open(&output, p_filename)) {
 		fprintf(stderr, "%s: Cannot open file %s\n", argv[0],
 			p_filename);
 		return 1;

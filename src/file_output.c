@@ -51,7 +51,7 @@ static bool serialize_msg_flow_rad(file_output_t *p_fout, suseconds_t timestamp,
 	return true;
 }
 
-bool file_output_init(file_output_t *p_fout, char *p_filename)
+bool file_output_open(file_output_t *p_fout, char *p_filename)
 {
 	p_fout->p_file = fopen(p_filename, "w");
 	if (p_fout->p_file == NULL) {

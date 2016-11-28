@@ -11,7 +11,7 @@ typedef struct {
 	bool initialized;
 } file_output_t;
 
-bool file_output_init(file_output_t *p_fout, char *p_filename);
+bool file_output_open(file_output_t *p_fout, char *p_filename);
 bool file_output_serialize(file_output_t *p_fout, suseconds_t timestamp,
 			   mavlink_message_t *p_msg);
 bool file_output_close(file_output_t *p_fout);
